@@ -328,7 +328,26 @@ def fill_database(files, debug=False, trackback=False, progressbar=True):
     tracker.print_stats()
 
 
+# systemds opens port 3000 and pass listen socket as
+# fd 3 to this script, which accepts all open connections
+# and response with http
+def systemd_socket_response():
+    import socket
+    sock = socket.fromfd(3, socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(0)
+    try:
+        while True:
+          conn, addr = sock.accept()
+          conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nOK")
+    except socket.timeout:
+        pass
+    except OSError as e:
+        print(e)
+
+
 def main(update_all, debug, trackback, do_fetch, progressbar):
+    if os.environ.get("LISTEN_FDS", None) != None:
+        systemd_socket_response()
     check_git_version()
     log = fetch_log_from_git(update_all, do_fetch)
     files = get_filenames_from_gitlog(log, update_all)
